@@ -2,7 +2,7 @@
 #
 # From the root of configuration:
 #
-# docker build -f docker/build/edxapp/Dockerfile .
+# docker build -f docker/build/jenkinsworker/Dockerfile .
 #
 # This allows the dockerfile to update /edx/app/edx_ansible/edx_ansible
 # with the currently checked-out configuration repo.
@@ -28,7 +28,29 @@ RUN sudo /edx/app/edx_ansible/venvs/edx_ansible/bin/ansible-playbook edxapp.yml 
     --extra-vars="edx_platform_version=${OPENEDX_RELEASE}" \
     --extra-vars="@/ansible_overrides.yml" \
     --extra-vars="@/devstack.yml" \
-    --extra-vars="@/devstack/ansible_overrides.yml" \
-    && rm -rf /edx/app/edxapp/edx-platform
+    --extra-vars="@/devstack/ansible_overrides.yml"
 
-EXPOSE 18000 18010
+# Add mongo
+RUN mkdir -p /data/db
+WORKDIR /edx/app/edx_ansible/edx_ansible/docker/plays
+RUN /edx/app/edx_ansible/venvs/edx_ansible/bin/ansible-playbook mongo.yml \
+    -i '127.0.0.1,' -c local \
+    -t 'install' \
+    -e@/ansible_overrides.yml
+
+# Add sshd
+RUN apt-get update
+RUN apt-get install -y openssh-server
+RUN mkdir /var/run/sshd
+RUN echo 'root:root' | chpasswd
+
+RUN sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+RUN sed -ri 's/UsePAM yes/#UsePAM yes/g' /etc/ssh/sshd_config
+
+RUN mkdir /root/.ssh
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+EXPOSE 18000 18010 27017 22
+
+CMD ["/usr/sbin/sshd", "-D"]

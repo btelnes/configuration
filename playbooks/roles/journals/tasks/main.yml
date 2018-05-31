@@ -47,6 +47,11 @@
     ports:
      - "9500:9200"
 
+- name: wait for elasticsearch container to start
+  wait_for:
+    port: 9500
+    delay: 10
+
 - name: update journal elasticsearch index
   shell: >
     {{ COMMON_BIN_DIR }}/python.journals {{ COMMON_BIN_DIR }}/manage.journals update_index --settings={{ JOURNALS_DJANGO_SETTINGS_MODULE }}
